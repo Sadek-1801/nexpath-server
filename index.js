@@ -1,12 +1,20 @@
 const express = require("express");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 5000;
 require("dotenv").config();
 
 // middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:5173"],
+    credentials: true,
+    optionSuccessStatus: 200,
+  })
+);
 app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.qv5d3vd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -22,24 +30,71 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    const jobsCollection = client.db('nexPath').collection('allJobs')
+    const jobsCollection = client.db("nexPath").collection("allJobs");
 
-    app.get('/jobs', async(req, res) => {
-        const result = await jobsCollection.find().toArray()
-        res.send(result)
-    })
+    app.get("/jobs", async (req, res) => {
+      const result = await jobsCollection.find().toArray();
+      res.send(result);
+    });
 
-    app.post('/job', async(req, res) => {
-        const jobData = req.body 
-        const result = await jobsCollection.insertOne(jobData) 
-        res.send(result)
-    })
+    // jwt
+    app.post("/jwt", async (req, res) => {
+      const email = req.body;
+      const token = await jwt.sign(email, process.env.ACCESS_TOKEN, {
+        expiresIn: "1h",
+      });
+      res
+        .cookie("token", token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        })
+        .send({ success: true });
+    });
 
-    app.get('/job/:id', async(req, res) => {
+    app.get("/logout", (req, res) => {
+      res
+        .clearCookie("token", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+          maxAge: 0,
+        })
+        .send({ success: true });
+    });
+
+    app.post("/job", async (req, res) => {
+      const jobData = req.body;
+      const result = await jobsCollection.insertOne(jobData);
+      res.send(result);
+    });
+    app.put("/updateJob/:id", async (req, res) => {
       const id = req.params.id;
-      const result = await jobsCollection.findOne({_id: new ObjectId(id)})
-      res.send(result)
-    })
+      console.log(id);
+      const updatedJob = req.body;
+      console.log(updatedJob);
+      const query = { _id: new ObjectId(id) };
+      const option = { upsert: true };
+      const updateDoc = {
+        $set: {
+          ...updatedJob,
+        },
+      };
+      const result = await jobsCollection.updateOne(query, updateDoc, option);
+      res.send(result);
+    });
+
+    app.get("/job/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await jobsCollection.findOne({ _id: new ObjectId(id) });
+      res.send(result);
+    });
+    app.get("/myJob/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { employerEmail: email };
+      const result = await jobsCollection.find(query).toArray();
+      res.send(result);
+    });
 
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();

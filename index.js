@@ -16,6 +16,23 @@ app.use(
   })
 );
 app.use(express.json());
+app.use(cookieParser())
+
+
+// verify token
+const verifyToken = (req, res, next) => {
+  const token = req.cookies?.token
+  if (!token) return res.status(401).send({ message: 'unauthorized access' })
+  if (token) {
+    jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
+      if (err) {
+        return res.status(401).send({ message: 'unauthorized access' })
+      }
+      req.user = decoded
+      next()
+    })
+  }
+}
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.qv5d3vd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -31,6 +48,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     const jobsCollection = client.db("nexPath").collection("allJobs");
+    const blogsCollection = client.db("nexPath").collection("blogs");
 
     app.get("/jobs", async (req, res) => {
       const result = await jobsCollection.find().toArray();
@@ -40,8 +58,8 @@ async function run() {
     // jwt
     app.post("/jwt", async (req, res) => {
       const email = req.body;
-      const token = await jwt.sign(email, process.env.ACCESS_TOKEN, {
-        expiresIn: "1h",
+      const token = jwt.sign(email, process.env.ACCESS_TOKEN, {
+        expiresIn: "5d",
       });
       res
         .cookie("token", token, {
@@ -89,10 +107,27 @@ async function run() {
       const result = await jobsCollection.findOne({ _id: new ObjectId(id) });
       res.send(result);
     });
-    app.get("/myJob/:email", async (req, res) => {
+    app.get("/myJob/:email", verifyToken, async (req, res) => {
+      const tokenEmail = req.user.email
       const email = req.params.email;
+      if (tokenEmail !== email) {
+        return res.status(403).send({ message: 'forbidden access' })
+      }
       const query = { employerEmail: email };
       const result = await jobsCollection.find(query).toArray();
+      res.send(result);
+    });
+
+
+
+    // blogs 
+    app.get("/blogs", async (req, res) => {
+      const result = await blogsCollection.find().toArray();
+      res.send(result);
+    });
+    app.get("/blog/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await blogsCollection.findOne({ _id: new ObjectId(id) });
       res.send(result);
     });
 

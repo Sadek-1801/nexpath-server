@@ -10,7 +10,7 @@ require("dotenv").config();
 // middleware
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: ["http://localhost:5173", "https://nex-path.web.app", "https://nexpath.netlify.app"],
     credentials: true,
     optionSuccessStatus: 200,
   })

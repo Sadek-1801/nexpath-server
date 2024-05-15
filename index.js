@@ -48,11 +48,13 @@ async function run() {
   try {
     const jobsCollection = client.db("nexPath").collection("allJobs");
     const blogsCollection = client.db("nexPath").collection("blogs");
+    const appliedJobCollection = client.db("nexPath").collection("appliedJobs");
 
     app.get("/jobs", async (req, res) => {
       const result = await jobsCollection.find().toArray();
       res.send(result);
     });
+
     app.get("/all_jobs", async (req, res) => {
       const search = req.query.search;
       const query = {
@@ -93,11 +95,10 @@ async function run() {
       const result = await jobsCollection.insertOne(jobData);
       res.send(result);
     });
+
     app.put("/updateJob/:id", async (req, res) => {
       const id = req.params.id;
-      console.log(id);
       const updatedJob = req.body;
-      console.log(updatedJob);
       const query = { _id: new ObjectId(id) };
       const option = { upsert: true };
       const updateDoc = {
@@ -108,7 +109,12 @@ async function run() {
       const result = await jobsCollection.updateOne(query, updateDoc, option);
       res.send(result);
     });
-
+    app.delete("/myJob/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const result = await jobsCollection.deleteOne(query)
+      res.send(result)
+    })
     app.get("/job/:id", async (req, res) => {
       const id = req.params.id;
       const result = await jobsCollection.findOne({ _id: new ObjectId(id) });
@@ -122,6 +128,28 @@ async function run() {
       }
       const query = { employerEmail: email };
       const result = await jobsCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    // applied job
+    app.get("/appliedJob/:email", verifyToken, async (req, res) => {
+      const tokenEmail = req.user.email;
+      const email = req.params.email;
+      const filter = req.query.filter;
+      if (tokenEmail !== email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      const query = { email: email };
+      if (filter) query.job_category = filter;
+      const result = await appliedJobCollection.find(query).toArray();
+      res.send(result);
+    });
+    // insert applied job
+    app.post("/appliedJob", async (req, res) => {
+      const jobData = req.body;
+      const result = await appliedJobCollection.insertOne(jobData);
+      const query = { _id: new ObjectId(jobData.jobId) };
+      await jobsCollection.updateOne(query, { $inc: { applicantNumber: 1 } });
       res.send(result);
     });
 

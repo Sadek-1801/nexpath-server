@@ -49,6 +49,7 @@ async function run() {
     const jobsCollection = client.db("nexPath").collection("allJobs");
     const blogsCollection = client.db("nexPath").collection("blogs");
     const appliedJobCollection = client.db("nexPath").collection("appliedJobs");
+    const reviewsCollection = client.db("nexPath").collection("reviews");
 
     app.get("/jobs", async (req, res) => {
       const result = await jobsCollection.find().toArray();
@@ -161,6 +162,16 @@ async function run() {
     app.get("/blog/:id", async (req, res) => {
       const id = req.params.id;
       const result = await blogsCollection.findOne({ _id: new ObjectId(id) });
+      res.send(result);
+    });
+    // reviews collection
+    app.get("/reviews", async (req, res) => {
+      const result = await reviewsCollection.find().toArray();
+      res.send(result);
+    });
+    app.post("/review", async (req, res) => {
+      const body = req.body;
+      const result = await reviewsCollection.insertOne(body);
       res.send(result);
     });
 
